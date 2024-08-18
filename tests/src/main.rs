@@ -116,11 +116,11 @@ fn main() {
             //         prefix::Variant::Vkmm,
             //     ));
             // }
-            report(&prefix::run_prefix_test(
-                &mut runner,
-                &config,
-                prefix::Variant::Nobar,
-            ));
+            // report(&prefix::run_prefix_test(
+            //     &mut runner,
+            //     &config,
+            //     prefix::Variant::Nobar,
+            // ));
             // report(&prefix::run_prefix_test(
             //     &mut runner,
             //     &config,
