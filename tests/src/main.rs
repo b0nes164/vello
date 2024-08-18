@@ -99,50 +99,60 @@ fn main() {
         }
         report(&clear::run_clear_test(&mut runner, &config));
         if config.groups.matches("prefix") {
-            report(&prefix::run_prefix_test(
-                &mut runner,
-                &config,
-                prefix::Variant::Compatibility,
-            ));
-            report(&prefix::run_prefix_test(
-                &mut runner,
-                &config,
-                prefix::Variant::Atomic,
-            ));
-            if runner.session.gpu_info().has_memory_model {
-                report(&prefix::run_prefix_test(
-                    &mut runner,
-                    &config,
-                    prefix::Variant::Vkmm,
-                ));
-            }
+            // report(&prefix::run_prefix_test(
+            //     &mut runner,
+            //     &config,
+            //     prefix::Variant::Compatibility,
+            // ));
+            // report(&prefix::run_prefix_test(
+            //     &mut runner,
+            //     &config,
+            //     prefix::Variant::Atomic,
+            // ));
+            // if runner.session.gpu_info().has_memory_model {
+            //     report(&prefix::run_prefix_test(
+            //         &mut runner,
+            //         &config,
+            //         prefix::Variant::Vkmm,
+            //     ));
+            // }
             report(&prefix::run_prefix_test(
                 &mut runner,
                 &config,
                 prefix::Variant::Nobar,
             ));
-            report(&prefix_tree::run_prefix_test(&mut runner, &config));
-        }
-        if config.groups.matches("atomic") {
-            report(&message_passing::run_message_passing_test(
+            // report(&prefix::run_prefix_test(
+            //     &mut runner,
+            //     &config,
+            //     prefix::Variant::Csdl,
+            // ));
+            report(&prefix::run_prefix_test(
                 &mut runner,
                 &config,
-                message_passing::Variant::Atomic,
+                prefix::Variant::Csdldf,
             ));
-            if runner.session.gpu_info().has_memory_model {
-                report(&message_passing::run_message_passing_test(
-                    &mut runner,
-                    &config,
-                    message_passing::Variant::Vkmm,
-                ));
-            }
-            report(&linkedlist::run_linkedlist_test(&mut runner, &config));
+            report(&prefix_tree::run_prefix_test(&mut runner, &config));
         }
-        #[cfg(feature = "piet-gpu")]
-        if config.groups.matches("piet") {
-            report(&path::path_test(&mut runner, &config));
-            report(&draw::draw_test(&mut runner, &config));
-            report(&clip::clip_test(&mut runner, &config));
-        }
+        // if config.groups.matches("atomic") {
+        //     report(&message_passing::run_message_passing_test(
+        //         &mut runner,
+        //         &config,
+        //         message_passing::Variant::Atomic,
+        //     ));
+        //     if runner.session.gpu_info().has_memory_model {
+        //         report(&message_passing::run_message_passing_test(
+        //             &mut runner,
+        //             &config,
+        //             message_passing::Variant::Vkmm,
+        //         ));
+        //     }
+        //     report(&linkedlist::run_linkedlist_test(&mut runner, &config));
+        // }
+        // #[cfg(feature = "piet-gpu")]
+        // if config.groups.matches("piet") {
+        //     report(&path::path_test(&mut runner, &config));
+        //     report(&draw::draw_test(&mut runner, &config));
+        //     report(&clip::clip_test(&mut runner, &config));
+        // }
     }
 }

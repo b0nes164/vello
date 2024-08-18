@@ -90,7 +90,7 @@ Monoid combine_monoid(thread const Monoid& a, thread const Monoid& b)
 kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[buffer(1)]], volatile device StateBuf& _43 [[buffer(2)]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]])
 {
     threadgroup uint sh_part_ix;
-    threadgroup Monoid sh_scratch[512];
+    threadgroup spvUnsafeArray<Monoid, 512> sh_scratch;
     threadgroup uint sh_flag;
     threadgroup Monoid sh_prefix;
     if (gl_LocalInvocationID.x == 0u)

@@ -1,0 +1,146 @@
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wunused-variable"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+#include <metal_atomic>
+
+using namespace metal;
+
+template<typename T, size_t Num>
+struct spvUnsafeArray
+{
+    T elements[Num ? Num : 1];
+    
+    thread T& operator [] (size_t pos) thread
+    {
+        return elements[pos];
+    }
+    constexpr const thread T& operator [] (size_t pos) const thread
+    {
+        return elements[pos];
+    }
+    
+    device T& operator [] (size_t pos) device
+    {
+        return elements[pos];
+    }
+    constexpr const device T& operator [] (size_t pos) const device
+    {
+        return elements[pos];
+    }
+    
+    constexpr const constant T& operator [] (size_t pos) const constant
+    {
+        return elements[pos];
+    }
+    
+    threadgroup T& operator [] (size_t pos) threadgroup
+    {
+        return elements[pos];
+    }
+    constexpr const threadgroup T& operator [] (size_t pos) const threadgroup
+    {
+        return elements[pos];
+    }
+};
+
+struct StateBuf
+{
+    uint part_counter;
+    uint state[1];
+};
+
+struct InBuf
+{
+    uint4 inbuf[1];
+};
+
+struct OutBuf
+{
+    uint4 outbuf[1];
+};
+
+constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(512u, 1u, 1u);
+
+kernel void main0(const device InBuf& _61 [[buffer(0)]], device OutBuf& _241 [[buffer(1)]], volatile device StateBuf& _23 [[buffer(2)]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]])
+{
+    threadgroup uint s_broadcast;
+    threadgroup spvUnsafeArray<uint, 512> s_reduce;
+    if (gl_LocalInvocationID.x == 0u)
+    {
+        uint _29 = atomic_fetch_add_explicit((volatile device atomic_uint*)&_23.part_counter, 1u, memory_order_relaxed);
+        s_broadcast = _29;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    uint part_id = s_broadcast;
+    uint red = 0u;
+    uint threadOffset = (gl_LocalInvocationID.x * 4u) + (part_id * 2048u);
+    spvUnsafeArray<uint4, 4> t_scan;
+    for (uint i = 0u; i < 4u; i++)
+    {
+        t_scan[i] = _61.inbuf[i + threadOffset];
+        t_scan[i].x += red;
+        t_scan[i].y += t_scan[i].x;
+        t_scan[i].z += t_scan[i].y;
+        t_scan[i].w += t_scan[i].z;
+        red = t_scan[i].w;
+    }
+    s_reduce[gl_LocalInvocationID.x] = red;
+    for (uint i_1 = 0u; i_1 < 9u; i_1++)
+    {
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (gl_LocalInvocationID.x >= (1u << i_1))
+        {
+            red += s_reduce[gl_LocalInvocationID.x - (1u << i_1)];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        s_reduce[gl_LocalInvocationID.x] = red;
+    }
+    if (gl_LocalInvocationID.x == 511u)
+    {
+        atomic_store_explicit((volatile device atomic_uint*)&_23.state[part_id], (red << uint(2)) | uint((part_id != 0u) ? 1 : 2), memory_order_relaxed);
+    }
+    if (part_id != 0u)
+    {
+        if (gl_LocalInvocationID.x == 511u)
+        {
+            uint prev_reduction = 0u;
+            uint lookback_id = part_id - 1u;
+            while (true)
+            {
+                uint _184 = atomic_load_explicit((volatile device atomic_uint*)&_23.state[lookback_id], memory_order_relaxed);
+                uint flag_payload = _184;
+                if ((flag_payload & 3u) == 2u)
+                {
+                    prev_reduction += (flag_payload >> uint(2));
+                    atomic_store_explicit((volatile device atomic_uint*)&_23.state[part_id], ((red + prev_reduction) << uint(2)) | 2u, memory_order_relaxed);
+                    s_broadcast = prev_reduction;
+                    break;
+                }
+                if ((flag_payload & 3u) == 1u)
+                {
+                    prev_reduction += (flag_payload >> uint(2));
+                    lookback_id--;
+                }
+            }
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    uint _218;
+    if (gl_LocalInvocationID.x != 0u)
+    {
+        _218 = s_reduce[gl_LocalInvocationID.x - 1u];
+    }
+    else
+    {
+        _218 = 0u;
+    }
+    uint prev = _218 + s_broadcast;
+    for (uint i_2 = 0u; i_2 < 4u; i_2++)
+    {
+        _241.outbuf[i_2 + threadOffset] = t_scan[i_2] + uint4(prev);
+    }
+}
+

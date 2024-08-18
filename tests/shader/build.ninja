@@ -47,6 +47,15 @@ build gen/prefix_nobar.hlsl: hlsl gen/prefix_nobar.spv
 build gen/prefix_nobar.dxil: dxil gen/prefix_nobar.hlsl
 build gen/prefix_nobar.msl: msl gen/prefix_nobar.spv
 
+build gen/csdl.spv: glsl csdl.comp
+build gen/csdl.hlsl: hlsl gen/csdl.spv
+build gen/csdl.dxil: dxil gen/csdl.hlsl
+build gen/csdl.msl: msl gen/csdl.spv
+
+build gen/csdldf.spv: glsl csdldf.comp
+build gen/csdldf.hlsl: hlsl gen/csdldf.spv
+build gen/csdldf.dxil: dxil gen/csdldf.hlsl
+build gen/csdldf.msl: msl gen/csdldf.spv
 
 build gen/prefix_reduce.spv: glsl prefix_reduce.comp
 build gen/prefix_reduce.hlsl: hlsl gen/prefix_reduce.spv

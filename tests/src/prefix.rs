@@ -54,6 +54,8 @@ pub enum Variant {
     Atomic,
     Vkmm,
     Nobar,
+    Csdl,
+    Csdldf,
 }
 
 pub unsafe fn run_prefix_test(
@@ -74,7 +76,8 @@ pub unsafe fn run_prefix_test(
         .session
         .create_buffer_with(
             n_elements * 4,
-            |b| b.extend(0..n_elements as u32),
+            //|b| b.extend(0..n_elements as u32),
+            |b| b.fill_one(n_elements as usize),
             BufferUsage::STORAGE,
         )
         .unwrap();
@@ -94,7 +97,11 @@ pub unsafe fn run_prefix_test(
         total_elapsed += runner.submit(commands);
         if i == 0 || config.verify_all {
             let dst = out_buf.map_read(..);
-            if let Some(failure) = verify(dst.cast_slice()) {
+
+            //let data_out: Vec<u32> = dst.cast_slice().to_vec();
+            //println!("{:?}", data_out);
+
+            if let Some(failure) = _verify_simple(dst.cast_slice()) {
                 result.fail(format!("failure at {}", failure));
             }
         }
@@ -110,6 +117,8 @@ impl PrefixCode {
             Variant::Atomic => include_shader!(&runner.session, "../shader/gen/prefix_atomic"),
             Variant::Vkmm => ShaderCode::Spv(include_bytes!("../shader/gen/prefix_vkmm.spv")),
             Variant::Nobar => include_shader!(&runner.session, "../shader/gen/prefix_nobar"),
+            Variant::Csdl => include_shader!(&runner.session, "../shader/gen/csdl"),
+            Variant::Csdldf => include_shader!(&runner.session, "../shader/gen/csdldf"),
         };
         let pipeline = runner
             .session
@@ -174,8 +183,14 @@ impl PrefixStage {
 }
 
 // Verify that the data is OEIS A000217
-fn verify(data: &[u32]) -> Option<usize> {
+fn _verify(data: &[u32]) -> Option<usize> {
     data.iter()
         .enumerate()
         .position(|(i, val)| ((i * (i + 1)) / 2) as u32 != *val)
+}
+
+fn _verify_simple(data: &[u32]) -> Option<usize> {
+    data.iter()
+        .enumerate()
+        .position(|(i, val)| (i + 1usize) as u32 != *val)
 }

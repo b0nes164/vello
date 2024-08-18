@@ -1,0 +1,162 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT OR Unlicense
+
+// Single pass prefix sum without barriers.
+
+#version 450
+
+#extension GL_KHR_memory_scope_semantics : enable
+
+//Tuning paramters
+#define VEC4            4
+#define LG_WG_SIZE      9
+#define WG_SIZE         (1 << LG_WG_SIZE)
+#define PART_SIZE       (WG_SIZE * VEC4)
+
+//For the decoupled fallback
+#define MAX_SPIN_COUNT  4
+#define LOCKED          1
+#define UNLOCKED        0   
+
+//For the decoupled lookback
+#define FLAG_NOT_READY  0    
+#define FLAG_REDUCTION  1
+#define FLAG_INCLUSIVE  2
+#define FLAG_MASK       3
+
+layout(local_size_x = WG_SIZE, local_size_y = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer InBuf {
+    uvec4[] inbuf;
+};
+
+layout(set = 0, binding = 1) buffer OutBuf {
+    uvec4[] outbuf;
+};
+
+// All operations in this buffer are atomic
+layout(set = 0, binding = 2) coherent buffer StateBuf {
+    uint part_counter;
+    uint[] state;
+};
+
+shared uint s_broadcast;
+shared uint s_lock;
+shared uint s_reduce[WG_SIZE];
+shared uint s_fallback[WG_SIZE];
+
+void main() {
+    //acquire the partition index
+    //set the lock
+    if(gl_LocalInvocationID.x == 0){
+        s_broadcast = atomicAdd(part_counter, 1);
+        s_lock = LOCKED;
+    }
+    barrier();
+    uint part_id = s_broadcast;
+
+    uint red = 0;
+    uvec4 t_scan[VEC4];
+    uint threadOffset = gl_LocalInvocationID.x * VEC4 + part_id * PART_SIZE;
+    for(uint i = 0; i < VEC4; ++i){
+        t_scan[i] = inbuf[i + threadOffset];
+        t_scan[i].x += red;
+        t_scan[i].y += t_scan[i].x;
+        t_scan[i].z += t_scan[i].y;
+        t_scan[i].w += t_scan[i].z;
+        red = t_scan[i].w;
+    }
+
+    s_reduce[gl_LocalInvocationID.x] = red;
+    for (uint i = 0; i < LG_WG_SIZE; i++) {
+        barrier();
+        if (gl_LocalInvocationID.x >= (1u << i)) {
+            red += s_reduce[gl_LocalInvocationID.x - (1u << i)];
+        }
+        barrier();
+        s_reduce[gl_LocalInvocationID.x] = red;
+    }
+    
+    if(gl_LocalInvocationID.x == WG_SIZE - 1){
+        atomicStore(state[part_id], red << 2 | (part_id != 0 ? FLAG_REDUCTION : FLAG_INCLUSIVE), gl_ScopeDevice, 0, 0);
+    }
+
+    if(part_id != 0){
+        uint prev_reduction = 0;
+        uint lookback_id = part_id - 1;
+
+        while(s_lock == LOCKED){
+            barrier();
+
+            if(gl_LocalInvocationID.x == WG_SIZE - 1){
+                for(uint spin_count = 0; spin_count < MAX_SPIN_COUNT; ){
+                    uint flag_payload = atomicLoad(state[lookback_id], gl_ScopeDevice, 0, 0);
+                    if((flag_payload & FLAG_MASK) > FLAG_NOT_READY){
+                        prev_reduction += flag_payload >> 2;
+                        if((flag_payload & FLAG_MASK) == FLAG_INCLUSIVE){
+                            atomicStore(state[part_id], red + prev_reduction << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_broadcast = prev_reduction;
+                            s_lock = UNLOCKED;
+                            break;
+                        }
+                        if((flag_payload & FLAG_MASK) == FLAG_REDUCTION){
+                            lookback_id--;
+                        }
+                    } else {
+                        spin_count++;
+                    }
+                }
+
+                if(s_lock == LOCKED){
+                    s_broadcast = lookback_id;
+                }
+            }
+            barrier();
+
+            //Fallback
+            if(s_lock == LOCKED){
+                uint fallback_id = s_broadcast;
+                uint f_end = (fallback_id + 1) * PART_SIZE;
+                uint f_red = 0;
+                for(uint i = gl_LocalInvocationID.x + fallback_id * PART_SIZE; i < f_end; i += WG_SIZE){
+                    uvec4 t = inbuf[i];
+                    f_red += t.x + t.y + t.z + t.w;
+                }
+
+                s_fallback[gl_LocalInvocationID.x] = f_red;
+                for (uint i = 0; i < LG_WG_SIZE; i++) {
+                    barrier();
+                    if (gl_LocalInvocationID.x >= (1u << i)) {
+                        f_red += s_fallback[gl_LocalInvocationID.x - (1u << i)];
+                    }
+                    barrier();
+                    s_fallback[gl_LocalInvocationID.x] = f_red;
+                }
+                
+                if(gl_LocalInvocationID.x == WG_SIZE - 1){
+                    uint flag_payload = f_red << 2 | (fallback_id != 0 ? FLAG_REDUCTION : FLAG_INCLUSIVE);
+                    uint prev_payload = atomicCompSwap(state[fallback_id], 0, flag_payload);
+                    if(prev_payload == 0){
+                        prev_reduction += f_red;
+                    } else {
+                        prev_reduction += prev_payload >> 2;
+                    }
+
+                    if(fallback_id == 0 || (prev_payload & FLAG_MASK) == FLAG_INCLUSIVE){
+                        atomicStore(state[part_id], red + prev_reduction << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                        s_broadcast = prev_reduction;
+                        s_lock = UNLOCKED;
+                    } else {
+                        lookback_id--;
+                    }
+                }
+                barrier();
+            }
+        }
+    }
+    barrier();
+
+    uint prev = (gl_LocalInvocationID.x != 0 ? s_reduce[gl_LocalInvocationID.x - 1] : 0) + s_broadcast;
+    for(uint i = 0; i < VEC4; ++i){
+        outbuf[i + threadOffset] = t_scan[i] + prev;
+    }
+}

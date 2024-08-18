@@ -64,6 +64,22 @@ impl BufWrite {
         self.len += len;
     }
 
+    /// Extend with ones.
+    ///
+    /// Panics if capacity is inadequate.
+    #[inline]
+    pub fn fill_one(&mut self, len: usize) {
+        assert!(self.capacity - self.len >= len * std::mem::size_of::<u32>());
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(
+                self.ptr.add(self.len) as *mut u32, 
+                len
+            );
+            slice.fill(1u32);
+        }
+        self.len += len * std::mem::size_of::<u32>();
+    }
+
     /// The total capacity of the buffer, in bytes.
     #[inline]
     pub fn capacity(&self) -> usize {
