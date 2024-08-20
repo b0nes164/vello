@@ -5,8 +5,8 @@ struct Monoid
 
 static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
 
-ByteAddressBuffer _40 : register(t0);
-RWByteAddressBuffer _127 : register(u1);
+ByteAddressBuffer _40 : register(t0, space0);
+RWByteAddressBuffer _127 : register(u1, space0);
 
 static uint3 gl_WorkGroupID;
 static uint3 gl_LocalInvocationID;

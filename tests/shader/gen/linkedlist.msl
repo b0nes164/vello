@@ -1,19 +1,12 @@
-#pragma clang diagnostic ignored "-Wunused-variable"
+#version 450
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-#include <metal_stdlib>
-#include <simd/simd.h>
-#include <metal_atomic>
-
-using namespace metal;
-
-struct MemBuf
+layout(binding = 0, std430) buffer MemBuf
 {
-    uint mem[1];
-};
+    uint mem[];
+} _56;
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(256u, 1u, 1u);
-
-kernel void main0(device MemBuf& _56 [[buffer(0)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+void main()
 {
     uint rng = gl_GlobalInvocationID.x + 1u;
     for (uint i = 0u; i < 100u; i++)
@@ -24,9 +17,9 @@ kernel void main0(device MemBuf& _56 [[buffer(0)]], uint3 gl_GlobalInvocationID 
         uint bucket = rng % 65536u;
         if (bucket != 0u)
         {
-            uint _61 = atomic_fetch_add_explicit((device atomic_uint*)&_56.mem[0], 2u, memory_order_relaxed);
+            uint _61 = atomicAdd(_56.mem[0], 2u);
             uint alloc = _61 + 65536u;
-            uint _67 = atomic_exchange_explicit((device atomic_uint*)&_56.mem[bucket], alloc, memory_order_relaxed);
+            uint _67 = atomicExchange(_56.mem[bucket], alloc);
             uint old = _67;
             _56.mem[alloc] = old;
             _56.mem[alloc + 1u] = gl_GlobalInvocationID.x;

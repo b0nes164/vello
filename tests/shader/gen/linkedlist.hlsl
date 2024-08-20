@@ -1,6 +1,6 @@
 static const uint3 gl_WorkGroupSize = uint3(256u, 1u, 1u);
 
-RWByteAddressBuffer _56 : register(u0);
+RWByteAddressBuffer _56 : register(u0, space0);
 
 static uint3 gl_GlobalInvocationID;
 struct SPIRV_Cross_Input

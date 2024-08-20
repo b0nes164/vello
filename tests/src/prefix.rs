@@ -98,8 +98,8 @@ pub unsafe fn run_prefix_test(
         if i == 0 || config.verify_all {
             let dst = out_buf.map_read(..);
 
-            //let data_out: Vec<u32> = dst.cast_slice().to_vec();
-            //println!("{:?}", data_out);
+            // let data_out: Vec<u32> = dst.cast_slice().to_vec();
+            // println!("{:?}", data_out);
 
             if let Some(failure) = _verify_simple(dst.cast_slice()) {
                 result.fail(format!("failure at {}", failure));

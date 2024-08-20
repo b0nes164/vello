@@ -14,9 +14,9 @@ static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
 
 static const Monoid _185 = { 0u };
 
-globallycoherent RWByteAddressBuffer _43 : register(u2);
-ByteAddressBuffer _67 : register(t0);
-RWByteAddressBuffer _372 : register(u1);
+globallycoherent RWByteAddressBuffer _43 : register(u2, space0);
+ByteAddressBuffer _67 : register(t0, space0);
+RWByteAddressBuffer _372 : register(u1, space0);
 
 static uint3 gl_LocalInvocationID;
 struct SPIRV_Cross_Input

@@ -7,8 +7,8 @@ static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
 
 static const Monoid _131 = { 0u };
 
-RWByteAddressBuffer _42 : register(u0);
-ByteAddressBuffer _141 : register(t1);
+RWByteAddressBuffer _42 : register(u0, space0);
+ByteAddressBuffer _141 : register(t1, space0);
 
 static uint3 gl_WorkGroupID;
 static uint3 gl_LocalInvocationID;

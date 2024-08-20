@@ -1,8 +1,8 @@
 static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
 
-globallycoherent RWByteAddressBuffer _23 : register(u2);
-ByteAddressBuffer _62 : register(t0);
-RWByteAddressBuffer _391 : register(u1);
+globallycoherent RWByteAddressBuffer _23 : register(u2, space0);
+ByteAddressBuffer _62 : register(t0, space0);
+RWByteAddressBuffer _391 : register(u1, space0);
 
 static uint3 gl_LocalInvocationID;
 struct SPIRV_Cross_Input
@@ -51,7 +51,7 @@ void comp_main()
     }
     if (gl_LocalInvocationID.x == 511u)
     {
-        _23.InterlockedExchange(part_id * 4 + 4, (red << uint(2)) | uint((part_id != 0u) ? 1 : 2), _405);
+        _23.InterlockedExchange(part_id * 4 + 4, (red << uint(2)) | uint((part_id != 0u) ? 1 : 2), _406);
     }
     if (part_id != 0u)
     {
@@ -73,7 +73,7 @@ void comp_main()
                         prev_reduction += (flag_payload >> uint(2));
                         if ((flag_payload & 3u) == 2u)
                         {
-                            _23.InterlockedExchange(part_id * 4 + 4, ((red + prev_reduction) << uint(2)) | 2u, _406);
+                            _23.InterlockedExchange(part_id * 4 + 4, ((red + prev_reduction) << uint(2)) | 2u, _407);
                             s_broadcast = prev_reduction;
                             s_lock = 0u;
                             break;
@@ -142,7 +142,7 @@ void comp_main()
                     }
                     if (_350)
                     {
-                        _23.InterlockedExchange(part_id * 4 + 4, ((red + prev_reduction) << uint(2)) | 2u, _407);
+                        _23.InterlockedExchange(part_id * 4 + 4, ((red + prev_reduction) << uint(2)) | 2u, _408);
                         s_broadcast = prev_reduction;
                         s_lock = 0u;
                     }
@@ -168,7 +168,7 @@ void comp_main()
     uint prev = _368 + s_broadcast;
     for (uint i_4 = 0u; i_4 < 4u; i_4++)
     {
-        _391.Store4((i_4 + threadOffset) * 16 + 0, t_scan[i_4] + prev.xxxx);
+        _391.Store4((i_4 + threadOffset) * 16 + 0, t_scan[i_4] + WaveActiveSum(prev).xxxx);
     }
 }
 

@@ -1,22 +1,18 @@
-#include <metal_stdlib>
-#include <simd/simd.h>
+#version 450
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-using namespace metal;
-
-struct ConfigBuf
+layout(binding = 0, std430) readonly buffer ConfigBuf
 {
     uint size;
     uint value;
-};
+} _19;
 
-struct TargetBuf
+layout(binding = 1, std430) buffer TargetBuf
 {
-    uint data[1];
-};
+    uint data[];
+} _32;
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(256u, 1u, 1u);
-
-kernel void main0(const device ConfigBuf& _19 [[buffer(0)]], device TargetBuf& _32 [[buffer(1)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+void main()
 {
     uint ix = gl_GlobalInvocationID.x;
     if (ix < _19.size)
