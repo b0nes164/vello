@@ -8,19 +8,19 @@ dxc = dxc
 
 # See https://github.com/KhronosGroup/SPIRV-Cross/issues/1248 for
 # why we set this.
-msl_flags = --msl-ios-use-simdgroup-functions --msl-version 20300 --msl-decoration-binding 
+msl_flags = --msl-decoration-binding --msl-version 20300
 
 rule glsl
   command = $glslang_validator $flags -V --target-env vulkan1.1 -o $out $in
 
 rule hlsl
-  command = $spirv_cross --hlsl --shader-model 60 $in --output $out
+  command = $spirv_cross --hlsl $in --output $out --shader-model 60
 
 rule dxil
   command = $dxc -T cs_6_0 $in -Fo $out
 
 rule msl
-  command = $spirv_cross $in --output $out $msl_flags
+  command = $spirv_cross --msl $in --output $out $msl_flags
 
 build gen/clear.spv: glsl clear.comp
 build gen/clear.hlsl: hlsl gen/clear.spv

@@ -1,5 +1,11 @@
-#version 450
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wunused-variable"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+#include <metal_atomic>
+
+using namespace metal;
 
 struct Element
 {
@@ -7,39 +13,42 @@ struct Element
     uint flag;
 };
 
-layout(binding = 0, std430) buffer DataBuf
+struct DataBuf
 {
-    Element data[];
-} data_buf;
+    Element data[1];
+};
 
-layout(binding = 1, std430) buffer ControlBuf
+struct ControlBuf
 {
     uint failures;
-} control_buf;
+};
 
-uint permute_flag_ix(uint data_ix)
+constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(256u, 1u, 1u);
+
+static inline __attribute__((always_inline))
+uint permute_flag_ix(thread const uint& data_ix)
 {
     return (data_ix * 419u) & 65535u;
 }
 
-void main()
+kernel void main0(device DataBuf& data_buf [[buffer(0)]], device ControlBuf& control_buf [[buffer(1)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
 {
-    atomicExchange(data_buf.data[gl_GlobalInvocationID.x].data, 1u);
-    memoryBarrierBuffer();
+    atomic_store_explicit((device atomic_uint*)&data_buf.data[gl_GlobalInvocationID.x].data, 1u, memory_order_relaxed);
+    threadgroup_barrier(mem_flags::mem_device);
     uint param = gl_GlobalInvocationID.x;
     uint write_flag_ix = permute_flag_ix(param);
-    atomicExchange(data_buf.data[write_flag_ix].flag, 1u);
+    atomic_store_explicit((device atomic_uint*)&data_buf.data[write_flag_ix].flag, 1u, memory_order_relaxed);
     uint read_ix = (gl_GlobalInvocationID.x * 4099u) & 65535u;
     uint param_1 = read_ix;
     uint read_flag_ix = permute_flag_ix(param_1);
-    uint _58 = atomicAdd(data_buf.data[read_flag_ix].flag, 0u);
+    uint _58 = atomic_load_explicit((device atomic_uint*)&data_buf.data[read_flag_ix].flag, memory_order_relaxed);
     uint flag = _58;
-    memoryBarrierBuffer();
-    uint _62 = atomicAdd(data_buf.data[read_ix].data, 0u);
+    threadgroup_barrier(mem_flags::mem_device);
+    uint _62 = atomic_load_explicit((device atomic_uint*)&data_buf.data[read_ix].data, memory_order_relaxed);
     uint data = _62;
     if (flag > data)
     {
-        uint _73 = atomicAdd(control_buf.failures, 1u);
+        uint _73 = atomic_fetch_add_explicit((device atomic_uint*)&control_buf.failures, 1u, memory_order_relaxed);
     }
 }
 

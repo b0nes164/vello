@@ -2,7 +2,7 @@ static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
 
 globallycoherent RWByteAddressBuffer _23 : register(u2, space0);
 ByteAddressBuffer _68 : register(t0, space0);
-RWByteAddressBuffer _296 : register(u1, space0);
+RWByteAddressBuffer _301 : register(u1, space0);
 
 static uint3 gl_LocalInvocationID;
 struct SPIRV_Cross_Input
@@ -34,11 +34,12 @@ void comp_main()
         offset += WaveGetLaneCount();
     }
     uint prev = 0u;
+    uint highest_lane = WaveGetLaneCount() - 1u;
     for (uint i_1 = 0u; i_1 < 4u; i_1++)
     {
         uint t = WavePrefixSum(t_scan[i_1].w);
         t_scan[i_1] += (t + prev).xxxx;
-        prev = WaveReadLaneAt(t_scan[i_1].w, 31u);
+        prev = WaveReadLaneAt(t_scan[i_1].w, highest_lane);
     }
     if (WaveGetLaneIndex() == 0u)
     {
@@ -49,26 +50,26 @@ void comp_main()
     if (gl_LocalInvocationID.x < WaveGetLaneCount())
     {
         bool pred = gl_LocalInvocationID.x < (512u / WaveGetLaneCount());
-        uint _165;
+        uint _168;
         if (pred)
         {
-            _165 = s_reduce[gl_LocalInvocationID.x];
+            _168 = s_reduce[gl_LocalInvocationID.x];
         }
         else
         {
-            _165 = 0u;
+            _168 = 0u;
         }
-        wg_red = WavePrefixSum(_165) + _165;
+        wg_red = WavePrefixSum(_168) + _168;
         if (pred)
         {
             s_reduce[gl_LocalInvocationID.x] = wg_red;
         }
-        wg_red = WaveReadLaneAt(wg_red, 15u);
+        wg_red = WaveReadLaneAt(wg_red, (512u / WaveGetLaneCount()) - 1u);
     }
     if (gl_LocalInvocationID.x == 0u)
     {
-        uint _311;
-        _23.InterlockedExchange(part_id * 4 + 4, (wg_red << uint(2)) | uint((part_id != 0u) ? 1 : 2), _311);
+        uint _316;
+        _23.InterlockedExchange(part_id * 4 + 4, (wg_red << uint(2)) | uint((part_id != 0u) ? 1 : 2), _316);
     }
     if (part_id != 0u)
     {
@@ -78,14 +79,14 @@ void comp_main()
             uint lookback_id = part_id - 1u;
             while (true)
             {
-                uint _222;
-                _23.InterlockedAdd(lookback_id * 4 + 4, 0, _222);
-                uint flag_payload = _222;
+                uint _227;
+                _23.InterlockedAdd(lookback_id * 4 + 4, 0, _227);
+                uint flag_payload = _227;
                 if ((flag_payload & 3u) == 2u)
                 {
                     prev_reduction += (flag_payload >> uint(2));
-                    uint _312;
-                    _23.InterlockedExchange(part_id * 4 + 4, ((wg_red + prev_reduction) << uint(2)) | 2u, _312);
+                    uint _317;
+                    _23.InterlockedExchange(part_id * 4 + 4, ((wg_red + prev_reduction) << uint(2)) | 2u, _317);
                     s_broadcast = prev_reduction;
                     break;
                 }
@@ -98,20 +99,20 @@ void comp_main()
         }
     }
     GroupMemoryBarrierWithGroupSync();
-    uint _258;
+    uint _263;
     if ((gl_LocalInvocationID.x / WaveGetLaneCount()) != 0u)
     {
-        _258 = s_reduce[(gl_LocalInvocationID.x / WaveGetLaneCount()) - 1u];
+        _263 = s_reduce[(gl_LocalInvocationID.x / WaveGetLaneCount()) - 1u];
     }
     else
     {
-        _258 = 0u;
+        _263 = 0u;
     }
-    uint prev_1 = _258 + s_broadcast;
+    uint prev_1 = _263 + s_broadcast;
     uint offset_1 = (WaveGetLaneIndex() + (((gl_LocalInvocationID.x / WaveGetLaneCount()) * WaveGetLaneCount()) * 4u)) + (part_id * 2048u);
     for (uint i_2 = 0u; i_2 < 4u; i_2++)
     {
-        _296.Store4(offset_1 * 16 + 0, t_scan[i_2] + prev_1.xxxx);
+        _301.Store4(offset_1 * 16 + 0, t_scan[i_2] + prev_1.xxxx);
         offset_1 += WaveGetLaneCount();
     }
 }

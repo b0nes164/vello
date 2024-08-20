@@ -7,6 +7,7 @@
 #extension GL_KHR_memory_scope_semantics : enable
 #extension GL_KHR_shader_subgroup_basic: enable
 #extension GL_KHR_shader_subgroup_ballot : enable
+#extension GL_KHR_shader_subgroup_shuffle : enable
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
 //Tuning paramters
@@ -64,10 +65,11 @@ void main() {
 
     {
         uint prev = 0;
+        uint highest_lane = gl_SubgroupSize - 1;
         for(uint i = 0; i < VEC4; ++i){
             uint t = subgroupExclusiveAdd(t_scan[i].w);
             t_scan[i] += t + prev;
-            prev = subgroupBroadcast(t_scan[i].w, 31); //Dumb hack but SPIR-V -> MSL does not support subgroup ballot?
+            prev = subgroupShuffle(t_scan[i].w, highest_lane);
         }
      
         if(gl_SubgroupInvocationID == 0){
@@ -83,7 +85,7 @@ void main() {
         if(pred){
             s_reduce[gl_LocalInvocationID.x] = wg_red; 
         }
-        wg_red = subgroupBroadcast(wg_red, WG_SIZE / 32 - 1); //Dumb hack but SPIR-V -> MSL does not support subgroup ballot?
+        wg_red = subgroupShuffle(wg_red, WG_SIZE / gl_SubgroupSize - 1);
     }
     
     if(gl_LocalInvocationID.x == 0){
