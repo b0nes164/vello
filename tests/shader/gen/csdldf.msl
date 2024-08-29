@@ -171,6 +171,7 @@ kernel void main0(const device InBuf& _69 [[buffer(0)]], device OutBuf& _454 [[b
                         if ((flag_payload & 3u) == 1u)
                         {
                             lookback_id--;
+                            spin_count = 0u;
                         }
                     }
                     else

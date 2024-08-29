@@ -1,0 +1,333 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT OR Unlicense
+
+// Single pass prefix sum without barriers.
+
+#version 450
+
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_KHR_shader_subgroup_basic: enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+#extension GL_KHR_shader_subgroup_shuffle : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+//Tuning paramters
+#define VEC4            4
+#define LG_WG_SIZE      9
+#define WG_SIZE         (1 << LG_WG_SIZE)
+#define PART_SIZE       (WG_SIZE * VEC4)
+#define MIN_SUB_SIZE    4
+
+//For the decoupled fallback
+#define MAX_SPIN_COUNT  4
+#define LOCKED          0
+#define UNLOCKED        1
+
+//For the decoupled lookback
+#define FLAG_NOT_READY  0    
+#define FLAG_REDUCTION  1
+#define FLAG_INCLUSIVE  2
+#define FLAG_MASK       3
+
+#define STATE_COUNT     4
+
+#define subgroupID (gl_LocalInvocationID.x / gl_SubgroupSize)
+
+layout(local_size_x = WG_SIZE, local_size_y = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer InBuf {
+    uvec4[] inbuf;
+};
+
+layout(set = 0, binding = 1) buffer OutBuf {
+    uvec4[] outbuf;
+};
+
+layout(set = 0, binding = 2) coherent buffer StateBuf {
+    uint part_counter;
+    uvec4[] state;
+};
+
+shared uint s_broadcast;
+shared uint s_lock;
+shared uint s_stateBroadcast[STATE_COUNT];
+shared uint s_reduce[WG_SIZE / MIN_SUB_SIZE];
+shared uint s_fallback[WG_SIZE / MIN_SUB_SIZE];
+
+void main() {
+    //acquire the partition index
+    //set the lock
+    if(gl_LocalInvocationID.x == 0){
+        s_broadcast = atomicAdd(part_counter, 1);
+        s_lock = LOCKED;
+    }
+    barrier();
+    uint part_id = s_broadcast;
+
+    uvec4 t_scan[VEC4];
+    {
+        uint offset = gl_SubgroupInvocationID + subgroupID * gl_SubgroupSize * VEC4 +
+            part_id * PART_SIZE;
+        for(uint i = 0; i < VEC4; ++i){
+            t_scan[i] = inbuf[offset];
+            t_scan[i].y += t_scan[i].x;
+            t_scan[i].z += t_scan[i].y;
+            t_scan[i].w += t_scan[i].z;
+            offset += gl_SubgroupSize;
+        }
+    }
+
+    {
+        uint prev = 0;
+        uint highest_lane = gl_SubgroupSize - 1;
+        for(uint i = 0; i < VEC4; ++i){
+            uint t = subgroupExclusiveAdd(t_scan[i].w);
+            t_scan[i] += t + prev;
+            prev = subgroupShuffle(t_scan[i].w, highest_lane);
+        }
+     
+        if(gl_SubgroupInvocationID == 0){
+            s_reduce[subgroupID] = prev;
+        }
+    }
+    barrier();
+
+    uint wg_red = 0;
+    if(gl_LocalInvocationID.x < gl_SubgroupSize){
+        bool pred = gl_LocalInvocationID.x < WG_SIZE / gl_SubgroupSize;
+        wg_red = subgroupInclusiveAdd(pred ? s_reduce[gl_LocalInvocationID.x] : 0);
+        if(pred){
+            s_reduce[gl_LocalInvocationID.x] = wg_red; 
+        }
+        wg_red = subgroupShuffle(wg_red, WG_SIZE / gl_SubgroupSize - 1);
+    }
+    
+    if(gl_LocalInvocationID.x == 0){
+        if(part_id != 0){
+            atomicStore(state[part_id].x, wg_red << 2 | FLAG_REDUCTION, gl_ScopeDevice, 0, 0);
+            atomicStore(state[part_id].y, wg_red << 2 | FLAG_REDUCTION, gl_ScopeDevice, 0, 0);
+            atomicStore(state[part_id].z, wg_red << 2 | FLAG_REDUCTION, gl_ScopeDevice, 0, 0);
+            atomicStore(state[part_id].w, wg_red << 2 | FLAG_REDUCTION, gl_ScopeDevice, 0, 0);
+        } else {
+            atomicStore(state[part_id].x, wg_red << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+            atomicStore(state[part_id].y, wg_red << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+            atomicStore(state[part_id].z, wg_red << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+            atomicStore(state[part_id].w, wg_red << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+        }
+    }
+
+    if(part_id != 0){
+        uint lookback_id = part_id - 1;
+
+        uint prev_reduction_0 = 0;
+        uint prev_reduction_1 = 0;
+        uint prev_reduction_2 = 0;
+        uint prev_reduction_3 = 0;
+
+        bool inc_0 = false;
+        bool inc_1 = false;
+        bool inc_2 = false;
+        bool inc_3 = false;
+
+        while(s_lock == LOCKED){
+            barrier();
+
+            bool red_0 = false;
+            bool red_1 = false;
+            bool red_2 = false;
+            bool red_3 = false;
+
+            if(gl_LocalInvocationID.x == 0){
+                for(uint spin_count = 0; spin_count < MAX_SPIN_COUNT; ){
+                    
+                    uint flag_payload;
+                    uint flag_value;
+                    if(!inc_0 && !red_0){
+                        flag_payload = atomicLoad(state[lookback_id].x, gl_ScopeDevice, 0, 0);
+                        flag_value = flag_payload & FLAG_MASK;
+                        if(flag_value == FLAG_REDUCTION){
+                            spin_count = 0;
+                            prev_reduction_0 += flag_payload >> 2;
+                            red_0 = true;
+                        } else if (flag_value == FLAG_INCLUSIVE){
+                            spin_count = 0;
+                            prev_reduction_0 += flag_payload >> 2;
+                            atomicStore(state[part_id].x, wg_red + prev_reduction_0 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[0] = prev_reduction_0;
+                            inc_0 = true;
+                        }
+                    }
+
+                    if(!inc_1 && !red_1){
+                        flag_payload = atomicLoad(state[lookback_id].y, gl_ScopeDevice, 0, 0);
+                        flag_value = flag_payload & FLAG_MASK;
+                        if(flag_value == FLAG_REDUCTION){
+                            spin_count = 0;
+                            prev_reduction_1 += flag_payload >> 2;
+                            red_1 = true;
+                        } else if (flag_value == FLAG_INCLUSIVE){
+                            spin_count = 0;
+                            prev_reduction_1 += flag_payload >> 2;
+                            atomicStore(state[part_id].y, wg_red + prev_reduction_1 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[1] = prev_reduction_1;
+                            inc_1 = true;
+                        }
+                    }
+
+                    if(!inc_2 && !red_2){
+                        flag_payload = atomicLoad(state[lookback_id].z, gl_ScopeDevice, 0, 0);
+                        flag_value = flag_payload & FLAG_MASK;
+                        if(flag_value == FLAG_REDUCTION){
+                            spin_count = 0;
+                            prev_reduction_2 += flag_payload >> 2;
+                            red_2 = true;
+                        } else if (flag_value == FLAG_INCLUSIVE){
+                            spin_count = 0;
+                            prev_reduction_2 += flag_payload >> 2;
+                            atomicStore(state[part_id].z, wg_red + prev_reduction_2 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[2] = prev_reduction_2;
+                            inc_2 = true;
+                        }
+                    }
+
+                    if(!inc_3 && !red_3){
+                        flag_payload = atomicLoad(state[lookback_id].w, gl_ScopeDevice, 0, 0);
+                        flag_value = flag_payload & FLAG_MASK;
+                        if(flag_value == FLAG_REDUCTION){
+                            spin_count = 0;
+                            prev_reduction_3 += flag_payload >> 2;
+                            red_3 = true;
+                        } else if (flag_value == FLAG_INCLUSIVE){
+                            spin_count = 0;
+                            prev_reduction_3 += flag_payload >> 2;
+                            atomicStore(state[part_id].w, wg_red + prev_reduction_3 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[3] = prev_reduction_3;
+                            inc_3 = true;
+                        }
+                    }
+
+                    if((inc_0 || red_0) && (inc_1 || red_1) && (inc_2 || red_2) && (inc_3 || red_3)){
+                        if(inc_0 && inc_1 && inc_2 && inc_3){
+                            s_lock = UNLOCKED;
+                            break;
+                        } else {
+                            lookback_id--;
+                            red_0 = false;
+                            red_1 = false;
+                            red_2 = false;
+                            red_3 = false;
+                        }
+                    } else {
+                        spin_count++;
+                    }
+                }
+
+                if(s_lock == LOCKED){
+                    s_broadcast = lookback_id;
+                }
+            }
+            barrier();
+
+            //Fallback
+            if(s_lock == LOCKED){
+                uint fallback_id = s_broadcast;
+                uint f_end = (fallback_id + 1) * PART_SIZE;
+                uint f_red = 0;
+                for(uint i = gl_LocalInvocationID.x + fallback_id * PART_SIZE; i < f_end; i += WG_SIZE){
+                    uvec4 t = inbuf[i];
+                    f_red += t.x + t.y + t.z + t.w; //No dot uvec4?
+                }
+
+                uint f_sub_red = subgroupAdd(f_red);
+                if(gl_SubgroupInvocationID == 0){
+                    s_fallback[subgroupID] = f_sub_red;
+                }
+                barrier();
+
+                if(gl_LocalInvocationID.x < gl_SubgroupSize){
+                    bool pred = gl_LocalInvocationID.x < WG_SIZE / gl_SubgroupSize;
+                    f_red = subgroupAdd(pred ? s_fallback[gl_LocalInvocationID.x] : 0);
+                }
+                
+                if(gl_LocalInvocationID.x == 0){
+                    uint flag_payload = f_red << 2 | (fallback_id != 0 ? FLAG_REDUCTION : FLAG_INCLUSIVE);
+
+                    if(!inc_0 && !red_0){
+                        uint prev_payload_0 = atomicCompSwap(state[fallback_id].x, 0, flag_payload);
+                        if(prev_payload_0 == 0){
+                            prev_reduction_0 += f_red;
+                        } else {
+                            prev_reduction_0 += prev_payload_0 >> 2;
+                        }
+                        if(fallback_id == 0 || (prev_payload_0 & FLAG_MASK) == FLAG_INCLUSIVE){
+                            atomicStore(state[part_id].x, wg_red + prev_reduction_0 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[0] = prev_reduction_0;
+                            inc_0 = true;
+                        }
+                    }
+                    
+                    if(!inc_1 && !red_1){
+                        uint prev_payload_1 = atomicCompSwap(state[fallback_id].y, 0, flag_payload);
+                        if(prev_payload_1 == 0){
+                            prev_reduction_1 += f_red;
+                        } else {
+                            prev_reduction_1 += prev_payload_1 >> 2;
+                        }
+                        if(fallback_id == 0 || (prev_payload_1 & FLAG_MASK) == FLAG_INCLUSIVE){
+                            atomicStore(state[part_id].y, wg_red + prev_reduction_1 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[1] = prev_reduction_1;
+                            inc_1 = true;
+                        }
+                    }
+
+                    if(!inc_2 && !red_2){
+                        uint prev_payload_2 = atomicCompSwap(state[fallback_id].z, 0, flag_payload);
+                        if(prev_payload_2 == 0){
+                            prev_reduction_2 += f_red;
+                        } else {
+                            prev_reduction_2 += prev_payload_2 >> 2;
+                        }
+                        if(fallback_id == 0 || (prev_payload_2 & FLAG_MASK) == FLAG_INCLUSIVE){
+                            atomicStore(state[part_id].z, wg_red + prev_reduction_2 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[2] = prev_reduction_2;
+                            inc_2 = true;
+                        }
+                    }
+
+                    if(!inc_3 && !red_3){
+                        uint prev_payload_3 = atomicCompSwap(state[fallback_id].w, 0, flag_payload);
+                        if(prev_payload_3 == 0){
+                            prev_reduction_3 += f_red;
+                        } else {
+                            prev_reduction_3 += prev_payload_3 >> 2;
+                        }
+                        if(fallback_id == 0 || (prev_payload_3 & FLAG_MASK) == FLAG_INCLUSIVE){
+                            atomicStore(state[part_id].w, wg_red + prev_reduction_3 << 2 | FLAG_INCLUSIVE, gl_ScopeDevice, 0, 0);
+                            s_stateBroadcast[3] = prev_reduction_3;
+                            inc_3 = true;
+                        }
+                    }
+                    
+                    //reductions must be true at this point, so only check if all incl
+                    if(inc_0 && inc_1 && inc_2 && inc_3){
+                        s_lock = UNLOCKED;
+                    } else {
+                        lookback_id--;
+                    }
+                }
+                barrier();
+            }
+        }
+    }
+    barrier();
+
+    uint regenerateState = part_id != 0 ? s_stateBroadcast[0] : 0;
+    uint prev = (subgroupID != 0 ? s_reduce[subgroupID - 1] : 0) + regenerateState;
+    {
+        uint offset = gl_SubgroupInvocationID + subgroupID * gl_SubgroupSize * VEC4 +
+            part_id * PART_SIZE;
+        for(uint i = 0; i < VEC4; ++i){
+            outbuf[offset] = t_scan[i] + prev;
+            offset += gl_SubgroupSize;
+        }
+    }
+}

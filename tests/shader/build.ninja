@@ -55,6 +55,12 @@ build gen/csdl.msl: msl gen/csdl.spv
 build gen/csdldf.spv: glsl csdldf.comp
 build gen/csdldf.msl: msl gen/csdldf.spv
 
+build gen/csdldf_aos_single.spv: glsl csdldf_aos_single.comp
+build gen/csdldf_aos_single.msl: msl gen/csdldf_aos_single.spv
+
+build gen/csdldf_aos_atom.spv: glsl csdldf_aos_atom.comp
+build gen/csdldf_aos_atom.msl: msl gen/csdldf_aos_atom.spv
+
 build gen/prefix_reduce.spv: glsl prefix_reduce.comp
 build gen/prefix_reduce.hlsl: hlsl gen/prefix_reduce.spv
 build gen/prefix_reduce.dxil: dxil gen/prefix_reduce.hlsl

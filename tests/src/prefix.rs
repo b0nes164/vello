@@ -56,6 +56,8 @@ pub enum Variant {
     Nobar,
     Csdl,
     Csdldf,
+    CsdldfAosSingle,
+    CsdldfAosAtom,
 }
 
 pub unsafe fn run_prefix_test(
@@ -119,6 +121,8 @@ impl PrefixCode {
             Variant::Nobar => include_shader!(&runner.session, "../shader/gen/prefix_nobar"),
             Variant::Csdl => include_shader!(&runner.session, "../shader/gen/csdl"),
             Variant::Csdldf => include_shader!(&runner.session, "../shader/gen/csdldf"),
+            Variant::CsdldfAosSingle => include_shader!(&runner.session, "../shader/gen/csdldf_aos_single"),
+            Variant::CsdldfAosAtom => include_shader!(&runner.session, "../shader/gen/csdldf_aos_atom"),
         };
         let pipeline = runner
             .session
@@ -136,7 +140,7 @@ impl PrefixCode {
 impl PrefixStage {
     unsafe fn new(runner: &mut Runner, n_elements: u64) -> PrefixStage {
         let n_workgroups = (n_elements + ELEMENTS_PER_WG - 1) / ELEMENTS_PER_WG;
-        let state_buf_size = 4 + 16 * n_workgroups;
+        let state_buf_size = 4 + 16 * n_workgroups; //STATE BUFF ALLOCATION SIZE
         let state_buf = runner
             .session
             .create_buffer(

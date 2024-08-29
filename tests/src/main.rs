@@ -126,12 +126,22 @@ fn main() {
             //     &config,
             //     prefix::Variant::Csdl,
             // ));
+            // report(&prefix::run_prefix_test(
+            //     &mut runner,
+            //     &config,
+            //     prefix::Variant::Csdldf,
+            // ));
             report(&prefix::run_prefix_test(
                 &mut runner,
                 &config,
-                prefix::Variant::Csdldf,
+                prefix::Variant::CsdldfAosSingle,
             ));
-            report(&prefix_tree::run_prefix_test(&mut runner, &config));
+            // report(&prefix::run_prefix_test(
+            //     &mut runner,
+            //     &config,
+            //     prefix::Variant::CsdldfAosAtom,
+            // ));
+            //report(&prefix_tree::run_prefix_test(&mut runner, &config));
         }
         // if config.groups.matches("atomic") {
         //     report(&message_passing::run_message_passing_test(
