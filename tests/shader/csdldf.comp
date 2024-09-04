@@ -47,8 +47,8 @@ layout(set = 0, binding = 2) coherent buffer StateBuf {
 
 shared uint s_broadcast;
 shared uint s_lock;
-shared uint s_reduce[WG_SIZE / MIN_SUB_SIZE];
-shared uint s_fallback[WG_SIZE / MIN_SUB_SIZE];
+shared uint s_reduce[WG_SIZE];
+shared uint s_fallback[WG_SIZE];
 
 void main() {
     //acquire the partition index
@@ -205,7 +205,7 @@ void main() {
                     barrier();
 
                     if(gl_LocalInvocationID.x == 0){
-                        f_red = s_fallback[WG_SIZE / gl_SubgroupSize - 1];
+                        f_red = s_fallback[red_size - 1];
                     }
                 }
                 
