@@ -121,16 +121,16 @@ fn main() {
             //     &config,
             //     prefix::Variant::Nobar,
             // ));
-            // report(&prefix::run_prefix_test(
-            //     &mut runner,
-            //     &config,
-            //     prefix::Variant::Csdl,
-            // ));
-            // report(&prefix::run_prefix_test(
-            //     &mut runner,
-            //     &config,
-            //     prefix::Variant::Csdldf,
-            // ));
+            report(&prefix::run_prefix_test(
+                &mut runner,
+                &config,
+                prefix::Variant::Csdl,
+            ));
+            report(&prefix::run_prefix_test(
+                &mut runner,
+                &config,
+                prefix::Variant::Csdldf,
+            ));
             report(&prefix::run_prefix_test(
                 &mut runner,
                 &config,

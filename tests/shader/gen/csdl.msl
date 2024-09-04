@@ -82,7 +82,7 @@ struct OutBuf
 
 constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(512u, 1u, 1u);
 
-kernel void main0(const device InBuf& _68 [[buffer(0)]], device OutBuf& _301 [[buffer(1)]], volatile device StateBuf& _23 [[buffer(2)]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]], uint gl_SubgroupInvocationID [[thread_index_in_simdgroup]], uint gl_SubgroupSize [[thread_execution_width]])
+kernel void main0(const device InBuf& _68 [[buffer(0)]], device OutBuf& _372 [[buffer(1)]], volatile device StateBuf& _23 [[buffer(2)]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]], uint gl_SubgroupInvocationID [[thread_index_in_simdgroup]], uint gl_SubgroupSize [[thread_execution_width]])
 {
     threadgroup uint s_broadcast;
     threadgroup spvUnsafeArray<uint, 512> s_reduce;
@@ -117,24 +117,55 @@ kernel void main0(const device InBuf& _68 [[buffer(0)]], device OutBuf& _301 [[b
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     uint wg_red = 0u;
-    if (gl_LocalInvocationID.x < gl_SubgroupSize)
+    if (gl_SubgroupSize >= 32u)
     {
-        bool pred = gl_LocalInvocationID.x < (512u / gl_SubgroupSize);
-        uint _168;
-        if (pred)
+        if (gl_LocalInvocationID.x < gl_SubgroupSize)
         {
-            _168 = s_reduce[gl_LocalInvocationID.x];
+            bool pred = gl_LocalInvocationID.x < (512u / gl_SubgroupSize);
+            uint _173;
+            if (pred)
+            {
+                _173 = s_reduce[gl_LocalInvocationID.x];
+            }
+            else
+            {
+                _173 = 0u;
+            }
+            wg_red = simd_prefix_inclusive_sum(_173);
+            if (pred)
+            {
+                s_reduce[gl_LocalInvocationID.x] = wg_red;
+            }
+            wg_red = spvSubgroupShuffle(wg_red, (512u / gl_SubgroupSize) - 1u);
         }
-        else
+    }
+    else
+    {
+        uint red_size = 512u / gl_SubgroupSize;
+        bool pred_1 = gl_LocalInvocationID.x < red_size;
+        if (pred_1)
         {
-            _168 = 0u;
+            wg_red = s_reduce[gl_LocalInvocationID.x];
         }
-        wg_red = simd_prefix_inclusive_sum(_168);
-        if (pred)
+        uint lg_red_size = uint(int(popcount(red_size - 1u)));
+        for (uint i_2 = 0u; i_2 < lg_red_size; i_2++)
         {
-            s_reduce[gl_LocalInvocationID.x] = wg_red;
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+            if ((gl_LocalInvocationID.x >= (1u << i_2)) && pred_1)
+            {
+                wg_red += s_reduce[gl_LocalInvocationID.x - (1u << i_2)];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+            if (pred_1)
+            {
+                s_reduce[gl_LocalInvocationID.x] = wg_red;
+            }
         }
-        wg_red = spvSubgroupShuffle(wg_red, (512u / gl_SubgroupSize) - 1u);
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (gl_LocalInvocationID.x == 0u)
+        {
+            wg_red = s_reduce[red_size - 1u];
+        }
     }
     if (gl_LocalInvocationID.x == 0u)
     {
@@ -148,8 +179,8 @@ kernel void main0(const device InBuf& _68 [[buffer(0)]], device OutBuf& _301 [[b
             uint lookback_id = part_id - 1u;
             while (true)
             {
-                uint _227 = atomic_load_explicit((volatile device atomic_uint*)&_23.state[lookback_id], memory_order_relaxed);
-                uint flag_payload = _227;
+                uint _298 = atomic_load_explicit((volatile device atomic_uint*)&_23.state[lookback_id], memory_order_relaxed);
+                uint flag_payload = _298;
                 if ((flag_payload & 3u) == 2u)
                 {
                     prev_reduction += (flag_payload >> uint(2));
@@ -166,20 +197,20 @@ kernel void main0(const device InBuf& _68 [[buffer(0)]], device OutBuf& _301 [[b
         }
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    uint _263;
+    uint _334;
     if ((gl_LocalInvocationID.x / gl_SubgroupSize) != 0u)
     {
-        _263 = s_reduce[(gl_LocalInvocationID.x / gl_SubgroupSize) - 1u];
+        _334 = s_reduce[(gl_LocalInvocationID.x / gl_SubgroupSize) - 1u];
     }
     else
     {
-        _263 = 0u;
+        _334 = 0u;
     }
-    uint prev_1 = _263 + s_broadcast;
+    uint prev_1 = _334 + s_broadcast;
     uint offset_1 = (gl_SubgroupInvocationID + (((gl_LocalInvocationID.x / gl_SubgroupSize) * gl_SubgroupSize) * 4u)) + (part_id * 2048u);
-    for (uint i_2 = 0u; i_2 < 4u; i_2++)
+    for (uint i_3 = 0u; i_3 < 4u; i_3++)
     {
-        _301.outbuf[offset_1] = t_scan[i_2] + uint4(prev_1);
+        _372.outbuf[offset_1] = t_scan[i_3] + uint4(prev_1);
         offset_1 += gl_SubgroupSize;
     }
 }

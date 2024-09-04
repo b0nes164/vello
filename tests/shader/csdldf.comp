@@ -88,14 +88,41 @@ void main() {
     }
     barrier();
 
+    //The square of subgroups below this size are less than the workgroup size
     uint wg_red = 0;
-    if(gl_LocalInvocationID.x < gl_SubgroupSize){
-        bool pred = gl_LocalInvocationID.x < WG_SIZE / gl_SubgroupSize;
-        wg_red = subgroupInclusiveAdd(pred ? s_reduce[gl_LocalInvocationID.x] : 0);
-        if(pred){
-            s_reduce[gl_LocalInvocationID.x] = wg_red; 
+    if(gl_SubgroupSize >= 32){
+        if(gl_LocalInvocationID.x < gl_SubgroupSize){
+            bool pred = gl_LocalInvocationID.x < WG_SIZE / gl_SubgroupSize;
+            wg_red = subgroupInclusiveAdd(pred ? s_reduce[gl_LocalInvocationID.x] : 0);
+            if(pred){
+                s_reduce[gl_LocalInvocationID.x] = wg_red; 
+            }
+            wg_red = subgroupShuffle(wg_red, WG_SIZE / gl_SubgroupSize - 1);
         }
-        wg_red = subgroupShuffle(wg_red, WG_SIZE / gl_SubgroupSize - 1);
+    } else {
+        uint red_size = WG_SIZE / gl_SubgroupSize;
+        bool pred = gl_LocalInvocationID.x < red_size;
+
+        if(pred){
+            wg_red = s_reduce[gl_LocalInvocationID.x];
+        }
+        
+        uint lg_red_size = bitCount(red_size - 1);
+        for (uint i = 0; i < lg_red_size; i++) {
+            barrier();
+            if (gl_LocalInvocationID.x >= (1u << i) && pred) {
+                wg_red += s_reduce[gl_LocalInvocationID.x - (1u << i)];
+            }
+            barrier();
+            if(pred){
+                s_reduce[gl_LocalInvocationID.x] = wg_red;
+            }
+        }
+        barrier();
+
+        if(gl_LocalInvocationID.x == 0){
+            wg_red = s_reduce[red_size - 1];
+        }
     }
     
     if(gl_LocalInvocationID.x == 0){
@@ -151,9 +178,35 @@ void main() {
                 }
                 barrier();
 
-                if(gl_LocalInvocationID.x < gl_SubgroupSize){
-                    bool pred = gl_LocalInvocationID.x < WG_SIZE / gl_SubgroupSize;
-                    f_red = subgroupAdd(pred ? s_fallback[gl_LocalInvocationID.x] : 0);
+                if(gl_SubgroupSize >= 32){
+                    if(gl_LocalInvocationID.x < gl_SubgroupSize){
+                        bool pred = gl_LocalInvocationID.x < WG_SIZE / gl_SubgroupSize;
+                        f_red = subgroupAdd(pred ? s_fallback[gl_LocalInvocationID.x] : 0);
+                    }
+                } else {
+                    uint red_size = WG_SIZE / gl_SubgroupSize;
+                    bool pred = gl_LocalInvocationID.x < red_size;
+                    
+                    if(pred){
+                        f_red = s_fallback[gl_LocalInvocationID.x];
+                    }
+
+                    uint lg_red_size = bitCount(red_size - 1);
+                    for (uint i = 0; i < lg_red_size; i++) {
+                        barrier();
+                        if (gl_LocalInvocationID.x >= (1u << i) && pred) {
+                            f_red += s_fallback[gl_LocalInvocationID.x - (1u << i)];
+                        }
+                        barrier();
+                        if(pred){
+                            s_fallback[gl_LocalInvocationID.x] = f_red;
+                        }
+                    }
+                    barrier();
+
+                    if(gl_LocalInvocationID.x == 0){
+                        f_red = s_fallback[WG_SIZE / gl_SubgroupSize - 1];
+                    }
                 }
                 
                 if(gl_LocalInvocationID.x == 0){
