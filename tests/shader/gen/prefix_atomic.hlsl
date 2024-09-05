@@ -10,13 +10,11 @@ struct State
     Monoid prefix;
 };
 
-static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
-
-static const Monoid _185 = { 0u };
+static const Monoid _181 = { 0u };
 
 globallycoherent RWByteAddressBuffer _43 : register(u2, space0);
 ByteAddressBuffer _67 : register(t0, space0);
-RWByteAddressBuffer _372 : register(u1, space0);
+RWByteAddressBuffer _364 : register(u1, space0);
 
 static uint3 gl_LocalInvocationID;
 struct SPIRV_Cross_Input
@@ -49,14 +47,17 @@ void comp_main()
     Monoid _71;
     _71.element = _67.Load(ix * 4 + 0);
     Monoid local[16];
-    local[0].element = _71.element;
-    Monoid param_1;
+    Monoid _73;
+    _73.element = _71.element;
+    local[0] = _73;
     for (uint i = 1u; i < 16u; i++)
     {
         Monoid param = local[i - 1u];
+        Monoid _93;
+        _93.element = _67.Load((ix + i) * 4 + 0);
         Monoid _94;
-        _94.element = _67.Load((ix + i) * 4 + 0);
-        param_1.element = _94.element;
+        _94.element = _93.element;
+        Monoid param_1 = _94;
         local[i] = combine_monoid(param, param_1);
     }
     Monoid agg = local[15];
@@ -76,10 +77,14 @@ void comp_main()
     }
     if (gl_LocalInvocationID.x == 511u)
     {
-        _43.Store(part_ix * 12 + 8, agg.element);
+        Monoid _157;
+        _157.element = agg.element;
+        _43.Store(part_ix * 12 + 8, _157.element);
         if (part_ix == 0u)
         {
-            _43.Store(12, agg.element);
+            Monoid _165;
+            _165.element = agg.element;
+            _43.Store(12, _165.element);
         }
     }
     DeviceMemoryBarrier();
@@ -90,24 +95,21 @@ void comp_main()
         {
             flag = 2u;
         }
-        uint _383;
-        _43.InterlockedExchange(part_ix * 12 + 4, flag, _383);
+        _43.InterlockedExchange(part_ix * 12 + 4, flag, _382);
     }
-    Monoid exclusive = _185;
+    Monoid exclusive = _181;
     if (part_ix != 0u)
     {
         uint look_back_ix = part_ix - 1u;
         uint their_ix = 0u;
-        Monoid their_prefix;
         Monoid their_agg;
-        Monoid m;
         while (true)
         {
             if (gl_LocalInvocationID.x == 511u)
             {
-                uint _208;
-                _43.InterlockedAdd(look_back_ix * 12 + 4, 0, _208);
-                sh_flag = _208;
+                uint _204;
+                _43.InterlockedAdd(look_back_ix * 12 + 4, 0, _204);
+                sh_flag = _204;
             }
             GroupMemoryBarrierWithGroupSync();
             DeviceMemoryBarrier();
@@ -117,9 +119,11 @@ void comp_main()
             {
                 if (gl_LocalInvocationID.x == 511u)
                 {
-                    Monoid _223;
-                    _223.element = _43.Load(look_back_ix * 12 + 12);
-                    their_prefix.element = _223.element;
+                    Monoid _219;
+                    _219.element = _43.Load(look_back_ix * 12 + 12);
+                    Monoid _220;
+                    _220.element = _219.element;
+                    Monoid their_prefix = _220;
                     Monoid param_4 = their_prefix;
                     Monoid param_5 = exclusive;
                     exclusive = combine_monoid(param_4, param_5);
@@ -132,9 +136,11 @@ void comp_main()
                 {
                     if (gl_LocalInvocationID.x == 511u)
                     {
-                        Monoid _245;
-                        _245.element = _43.Load(look_back_ix * 12 + 8);
-                        their_agg.element = _245.element;
+                        Monoid _240;
+                        _240.element = _43.Load(look_back_ix * 12 + 8);
+                        Monoid _241;
+                        _241.element = _240.element;
+                        their_agg = _241;
                         Monoid param_6 = their_agg;
                         Monoid param_7 = exclusive;
                         exclusive = combine_monoid(param_6, param_7);
@@ -146,9 +152,11 @@ void comp_main()
             }
             if (gl_LocalInvocationID.x == 511u)
             {
-                Monoid _267;
-                _267.element = _67.Load(((look_back_ix * 8192u) + their_ix) * 4 + 0);
-                m.element = _267.element;
+                Monoid _261;
+                _261.element = _67.Load(((look_back_ix * 8192u) + their_ix) * 4 + 0);
+                Monoid _262;
+                _262.element = _261.element;
+                Monoid m = _262;
                 if (their_ix == 0u)
                 {
                     their_agg = m;
@@ -190,13 +198,14 @@ void comp_main()
             Monoid param_13 = agg;
             Monoid inclusive_prefix = combine_monoid(param_12, param_13);
             sh_prefix = exclusive;
-            _43.Store(part_ix * 12 + 12, inclusive_prefix.element);
+            Monoid _314;
+            _314.element = inclusive_prefix.element;
+            _43.Store(part_ix * 12 + 12, _314.element);
         }
         DeviceMemoryBarrier();
         if (gl_LocalInvocationID.x == 511u)
         {
-            uint _384;
-            _43.InterlockedExchange(part_ix * 12 + 4, 2u, _384);
+            _43.InterlockedExchange(part_ix * 12 + 4, 2u, _391);
         }
     }
     GroupMemoryBarrierWithGroupSync();
@@ -217,7 +226,10 @@ void comp_main()
         Monoid param_16 = row;
         Monoid param_17 = local[i_2];
         Monoid m_1 = combine_monoid(param_16, param_17);
-        _372.Store((ix + i_2) * 4 + 0, m_1.element);
+        uint _367 = ix + i_2;
+        Monoid _370;
+        _370.element = m_1.element;
+        _364.Store(_367 * 4 + 0, _370.element);
     }
 }
 

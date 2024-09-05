@@ -11,7 +11,7 @@ dxc = dxc
 msl_flags = --msl-decoration-binding --msl-version 20300
 
 rule glsl
-  command = $glslang_validator $flags -V --target-env vulkan1.1 -o $out $in
+  command = $glslang_validator $flags -V --target-env vulkan1.3 -o $out $in
 
 rule hlsl
   command = $spirv_cross --hlsl $in --output $out --shader-model 60
@@ -34,8 +34,6 @@ build gen/prefix.msl: msl gen/prefix.spv
 
 build gen/prefix_atomic.spv: glsl prefix.comp
   flags = -DATOMIC
-build gen/prefix_atomic.hlsl: hlsl gen/prefix_atomic.spv
-build gen/prefix_atomic.dxil: dxil gen/prefix_atomic.hlsl
 build gen/prefix_atomic.msl: msl gen/prefix_atomic.spv
 
 build gen/prefix_vkmm.spv: glsl prefix.comp
@@ -43,8 +41,6 @@ build gen/prefix_vkmm.spv: glsl prefix.comp
 # Vulkan memory model doesn't translate
 
 build gen/prefix_nobar.spv: glsl prefix_nobar.comp
-build gen/prefix_nobar.hlsl: hlsl gen/prefix_nobar.spv
-build gen/prefix_nobar.dxil: dxil gen/prefix_nobar.hlsl
 build gen/prefix_nobar.msl: msl gen/prefix_nobar.spv
 
 build gen/csdl.spv: glsl csdl.comp

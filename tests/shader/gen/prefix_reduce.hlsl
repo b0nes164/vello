@@ -3,10 +3,8 @@ struct Monoid
     uint element;
 };
 
-static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
-
 ByteAddressBuffer _40 : register(t0, space0);
-RWByteAddressBuffer _127 : register(u1, space0);
+RWByteAddressBuffer _125 : register(u1, space0);
 
 static uint3 gl_WorkGroupID;
 static uint3 gl_LocalInvocationID;
@@ -31,15 +29,17 @@ void comp_main()
     uint ix = gl_GlobalInvocationID.x * 8u;
     Monoid _44;
     _44.element = _40.Load(ix * 4 + 0);
-    Monoid agg;
-    agg.element = _44.element;
-    Monoid param_1;
+    Monoid _45;
+    _45.element = _44.element;
+    Monoid agg = _45;
     for (uint i = 1u; i < 8u; i++)
     {
         Monoid param = agg;
+        Monoid _63;
+        _63.element = _40.Load((ix + i) * 4 + 0);
         Monoid _64;
-        _64.element = _40.Load((ix + i) * 4 + 0);
-        param_1.element = _64.element;
+        _64.element = _63.element;
+        Monoid param_1 = _64;
         agg = combine_monoid(param, param_1);
     }
     sh_scratch[gl_LocalInvocationID.x] = agg;
@@ -58,7 +58,9 @@ void comp_main()
     }
     if (gl_LocalInvocationID.x == 0u)
     {
-        _127.Store(gl_WorkGroupID.x * 4 + 0, agg.element);
+        Monoid _131;
+        _131.element = agg.element;
+        _125.Store(gl_WorkGroupID.x * 4 + 0, _131.element);
     }
 }
 

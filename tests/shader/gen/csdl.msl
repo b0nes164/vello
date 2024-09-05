@@ -80,8 +80,6 @@ struct OutBuf
     uint4 outbuf[1];
 };
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(512u, 1u, 1u);
-
 kernel void main0(const device InBuf& _68 [[buffer(0)]], device OutBuf& _372 [[buffer(1)]], volatile device StateBuf& _23 [[buffer(2)]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]], uint gl_SubgroupInvocationID [[thread_index_in_simdgroup]], uint gl_SubgroupSize [[thread_execution_width]])
 {
     threadgroup uint s_broadcast;

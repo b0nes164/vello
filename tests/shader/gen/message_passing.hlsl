@@ -4,8 +4,6 @@ struct Element
     uint flag;
 };
 
-static const uint3 gl_WorkGroupSize = uint3(256u, 1u, 1u);
-
 RWByteAddressBuffer data_buf : register(u0, space0);
 RWByteAddressBuffer control_buf : register(u1, space0);
 

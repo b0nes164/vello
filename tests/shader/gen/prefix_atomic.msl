@@ -79,15 +79,13 @@ struct OutBuf
     Monoid_1 outbuf[1];
 };
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(512u, 1u, 1u);
-
 static inline __attribute__((always_inline))
 Monoid combine_monoid(thread const Monoid& a, thread const Monoid& b)
 {
     return Monoid{ a.element + b.element };
 }
 
-kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[buffer(1)]], volatile device StateBuf& _43 [[buffer(2)]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]])
+kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _364 [[buffer(1)]], volatile device StateBuf& _43 [[buffer(2)]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]])
 {
     threadgroup uint sh_part_ix;
     threadgroup spvUnsafeArray<Monoid, 512> sh_scratch;
@@ -102,12 +100,15 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
     uint part_ix = sh_part_ix;
     uint ix = (part_ix * 8192u) + (gl_LocalInvocationID.x * 16u);
     spvUnsafeArray<Monoid, 16> local;
-    local[0].element = _67.inbuf[ix].element;
-    Monoid param_1;
+    Monoid _73;
+    _73.element = _67.inbuf[ix].element;
+    local[0] = _73;
     for (uint i = 1u; i < 16u; i++)
     {
         Monoid param = local[i - 1u];
-        param_1.element = _67.inbuf[ix + i].element;
+        Monoid _94;
+        _94.element = _67.inbuf[ix + i].element;
+        Monoid param_1 = _94;
         local[i] = combine_monoid(param, param_1);
     }
     Monoid agg = local[15];
@@ -127,10 +128,14 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
     }
     if (gl_LocalInvocationID.x == 511u)
     {
-        _43.state[part_ix].aggregate.element = agg.element;
+        Monoid_1 _157;
+        _157.element = agg.element;
+        _43.state[part_ix].aggregate = _157;
         if (part_ix == 0u)
         {
-            _43.state[0].prefix.element = agg.element;
+            Monoid_1 _165;
+            _165.element = agg.element;
+            _43.state[0].prefix = _165;
         }
     }
     threadgroup_barrier(mem_flags::mem_device);
@@ -148,15 +153,13 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
     {
         uint look_back_ix = part_ix - 1u;
         uint their_ix = 0u;
-        Monoid their_prefix;
         Monoid their_agg;
-        Monoid m;
         while (true)
         {
             if (gl_LocalInvocationID.x == 511u)
             {
-                uint _208 = atomic_load_explicit((volatile device atomic_uint*)&_43.state[look_back_ix].flag, memory_order_relaxed);
-                sh_flag = _208;
+                uint _204 = atomic_load_explicit((volatile device atomic_uint*)&_43.state[look_back_ix].flag, memory_order_relaxed);
+                sh_flag = _204;
             }
             threadgroup_barrier(mem_flags::mem_threadgroup);
             threadgroup_barrier(mem_flags::mem_device);
@@ -166,7 +169,9 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
             {
                 if (gl_LocalInvocationID.x == 511u)
                 {
-                    their_prefix.element = _43.state[look_back_ix].prefix.element;
+                    Monoid _220;
+                    _220.element = _43.state[look_back_ix].prefix.element;
+                    Monoid their_prefix = _220;
                     Monoid param_4 = their_prefix;
                     Monoid param_5 = exclusive;
                     exclusive = combine_monoid(param_4, param_5);
@@ -179,7 +184,9 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
                 {
                     if (gl_LocalInvocationID.x == 511u)
                     {
-                        their_agg.element = _43.state[look_back_ix].aggregate.element;
+                        Monoid _241;
+                        _241.element = _43.state[look_back_ix].aggregate.element;
+                        their_agg = _241;
                         Monoid param_6 = their_agg;
                         Monoid param_7 = exclusive;
                         exclusive = combine_monoid(param_6, param_7);
@@ -191,7 +198,9 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
             }
             if (gl_LocalInvocationID.x == 511u)
             {
-                m.element = _67.inbuf[(look_back_ix * 8192u) + their_ix].element;
+                Monoid _262;
+                _262.element = _67.inbuf[(look_back_ix * 8192u) + their_ix].element;
+                Monoid m = _262;
                 if (their_ix == 0u)
                 {
                     their_agg = m;
@@ -233,7 +242,9 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
             Monoid param_13 = agg;
             Monoid inclusive_prefix = combine_monoid(param_12, param_13);
             sh_prefix = exclusive;
-            _43.state[part_ix].prefix.element = inclusive_prefix.element;
+            Monoid_1 _314;
+            _314.element = inclusive_prefix.element;
+            _43.state[part_ix].prefix = _314;
         }
         threadgroup_barrier(mem_flags::mem_device);
         if (gl_LocalInvocationID.x == 511u)
@@ -259,7 +270,9 @@ kernel void main0(const device InBuf& _67 [[buffer(0)]], device OutBuf& _372 [[b
         Monoid param_16 = row;
         Monoid param_17 = local[i_2];
         Monoid m_1 = combine_monoid(param_16, param_17);
-        _372.outbuf[ix + i_2].element = m_1.element;
+        Monoid_1 _370;
+        _370.element = m_1.element;
+        _364.outbuf[ix + i_2] = _370;
     }
 }
 

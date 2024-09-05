@@ -11,13 +11,11 @@ struct State
     uint global_1;
 };
 
-static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
-
-static const Monoid _203 = { 0u };
+static const Monoid _201 = { 0u };
 
 globallycoherent RWByteAddressBuffer _74 : register(u2, space0);
 ByteAddressBuffer _98 : register(t0, space0);
-RWByteAddressBuffer _423 : register(u1, space0);
+RWByteAddressBuffer _420 : register(u1, space0);
 
 static uint3 gl_LocalInvocationID;
 struct SPIRV_Cross_Input
@@ -62,14 +60,17 @@ void comp_main()
     Monoid _102;
     _102.element = _98.Load(ix * 4 + 0);
     Monoid local[16];
-    local[0].element = _102.element;
-    Monoid param_1;
+    Monoid _104;
+    _104.element = _102.element;
+    local[0] = _104;
     for (uint i = 1u; i < 16u; i++)
     {
         Monoid param = local[i - 1u];
+        Monoid _124;
+        _124.element = _98.Load((ix + i) * 4 + 0);
         Monoid _125;
-        _125.element = _98.Load((ix + i) * 4 + 0);
-        param_1.element = _125.element;
+        _125.element = _124.element;
+        Monoid param_1 = _125;
         local[i] = combine_monoid(param, param_1);
     }
     Monoid agg = local[15];
@@ -91,28 +92,25 @@ void comp_main()
     {
         Monoid param_4 = agg;
         uint2 split_agg = split_monoid(param_4);
-        uint _434;
         _74.InterlockedExchange(part_ix * 16 + 4, split_agg.x | 2147483648u, _434);
-        uint _435;
         _74.InterlockedExchange(part_ix * 16 + 8, split_agg.y | 2147483648u, _435);
     }
-    Monoid exclusive = _203;
+    Monoid exclusive = _201;
     if (part_ix != 0u)
     {
         uint look_back_ix = part_ix - 1u;
         uint their_ix = 0u;
         Monoid their_agg;
-        Monoid m;
         while (true)
         {
             if (gl_LocalInvocationID.x == 511u)
             {
-                uint _226;
-                _74.InterlockedAdd(look_back_ix * 16 + 4, 0, _226);
-                uint sc_0 = _226;
-                uint _230;
-                _74.InterlockedAdd(look_back_ix * 16 + 8, 0, _230);
-                uint sc_1 = _230;
+                uint _224;
+                _74.InterlockedAdd(look_back_ix * 16 + 4, 0, _224);
+                uint sc_0 = _224;
+                uint _228;
+                _74.InterlockedAdd(look_back_ix * 16 + 8, 0, _228);
+                uint sc_1 = _228;
                 sh_local_split = uint2(sc_0, sc_1);
             }
             GroupMemoryBarrierWithGroupSync();
@@ -125,12 +123,12 @@ void comp_main()
                 {
                     if (gl_LocalInvocationID.x == 511u)
                     {
-                        uint _264;
-                        _74.InterlockedAdd(look_back_ix * 16 + 12, 0, _264);
-                        uint sc_0_1 = _264;
-                        uint _269;
-                        _74.InterlockedAdd(look_back_ix * 16 + 16, 0, _269);
-                        uint sc_1_1 = _269;
+                        uint _262;
+                        _74.InterlockedAdd(look_back_ix * 16 + 12, 0, _262);
+                        uint sc_0_1 = _262;
+                        uint _267;
+                        _74.InterlockedAdd(look_back_ix * 16 + 16, 0, _267);
+                        uint sc_1_1 = _267;
                         sh_global_split = uint2(sc_0_1, sc_1_1);
                     }
                     GroupMemoryBarrierWithGroupSync();
@@ -157,9 +155,11 @@ void comp_main()
             }
             if (gl_LocalInvocationID.x == 511u)
             {
-                Monoid _317;
-                _317.element = _98.Load(((look_back_ix * 8192u) + their_ix) * 4 + 0);
-                m.element = _317.element;
+                Monoid _315;
+                _315.element = _98.Load(((look_back_ix * 8192u) + their_ix) * 4 + 0);
+                Monoid _316;
+                _316.element = _315.element;
+                Monoid m = _316;
                 if (their_ix == 0u)
                 {
                     their_agg = m;
@@ -197,10 +197,8 @@ void comp_main()
             sh_prefix = exclusive;
             Monoid param_15 = inclusive_prefix;
             uint2 split_inclusive = split_monoid(param_15);
-            uint _436;
-            _74.InterlockedExchange(part_ix * 16 + 12, split_inclusive.x | 2147483648u, _436);
-            uint _437;
-            _74.InterlockedExchange(part_ix * 16 + 16, split_inclusive.y | 2147483648u, _437);
+            _74.InterlockedExchange(part_ix * 16 + 12, split_inclusive.x | 2147483648u, _438);
+            _74.InterlockedExchange(part_ix * 16 + 16, split_inclusive.y | 2147483648u, _439);
         }
     }
     GroupMemoryBarrierWithGroupSync();
@@ -221,7 +219,10 @@ void comp_main()
         Monoid param_18 = row;
         Monoid param_19 = local[i_2];
         Monoid m_1 = combine_monoid(param_18, param_19);
-        _423.Store((ix + i_2) * 4 + 0, m_1.element);
+        uint _423 = ix + i_2;
+        Monoid _426;
+        _426.element = m_1.element;
+        _420.Store(_423 * 4 + 0, _426.element);
     }
 }
 

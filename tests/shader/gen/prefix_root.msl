@@ -59,8 +59,6 @@ struct DataBuf
     Monoid_1 data[1];
 };
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(512u, 1u, 1u);
-
 static inline __attribute__((always_inline))
 Monoid combine_monoid(thread const Monoid& a, thread const Monoid& b)
 {
@@ -72,12 +70,15 @@ kernel void main0(device DataBuf& _42 [[buffer(0)]], uint3 gl_GlobalInvocationID
     threadgroup spvUnsafeArray<Monoid, 512> sh_scratch;
     uint ix = gl_GlobalInvocationID.x * 8u;
     spvUnsafeArray<Monoid, 8> local;
-    local[0].element = _42.data[ix].element;
-    Monoid param_1;
+    Monoid _48;
+    _48.element = _42.data[ix].element;
+    local[0] = _48;
     for (uint i = 1u; i < 8u; i++)
     {
         Monoid param = local[i - 1u];
-        param_1.element = _42.data[ix + i].element;
+        Monoid _71;
+        _71.element = _42.data[ix + i].element;
+        Monoid param_1 = _71;
         local[i] = combine_monoid(param, param_1);
     }
     Monoid agg = local[7];
@@ -106,7 +107,9 @@ kernel void main0(device DataBuf& _42 [[buffer(0)]], uint3 gl_GlobalInvocationID
         Monoid param_4 = row;
         Monoid param_5 = local[i_2];
         Monoid m = combine_monoid(param_4, param_5);
-        _42.data[ix + i_2].element = m.element;
+        Monoid_1 _161;
+        _161.element = m.element;
+        _42.data[ix + i_2] = _161;
     }
 }
 

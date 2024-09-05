@@ -64,25 +64,25 @@ struct OutBuf
     Monoid_1 outbuf[1];
 };
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(512u, 1u, 1u);
-
 static inline __attribute__((always_inline))
 Monoid combine_monoid(thread const Monoid& a, thread const Monoid& b)
 {
     return Monoid{ a.element + b.element };
 }
 
-kernel void main0(const device InBuf& _40 [[buffer(0)]], device OutBuf& _127 [[buffer(1)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]], uint3 gl_WorkGroupID [[threadgroup_position_in_grid]])
+kernel void main0(const device InBuf& _40 [[buffer(0)]], device OutBuf& _125 [[buffer(1)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]], uint3 gl_WorkGroupID [[threadgroup_position_in_grid]])
 {
     threadgroup spvUnsafeArray<Monoid, 512> sh_scratch;
     uint ix = gl_GlobalInvocationID.x * 8u;
-    Monoid agg;
-    agg.element = _40.inbuf[ix].element;
-    Monoid param_1;
+    Monoid _45;
+    _45.element = _40.inbuf[ix].element;
+    Monoid agg = _45;
     for (uint i = 1u; i < 8u; i++)
     {
         Monoid param = agg;
-        param_1.element = _40.inbuf[ix + i].element;
+        Monoid _64;
+        _64.element = _40.inbuf[ix + i].element;
+        Monoid param_1 = _64;
         agg = combine_monoid(param, param_1);
     }
     sh_scratch[gl_LocalInvocationID.x] = agg;
@@ -101,7 +101,9 @@ kernel void main0(const device InBuf& _40 [[buffer(0)]], device OutBuf& _127 [[b
     }
     if (gl_LocalInvocationID.x == 0u)
     {
-        _127.outbuf[gl_WorkGroupID.x].element = agg.element;
+        Monoid_1 _131;
+        _131.element = agg.element;
+        _125.outbuf[gl_WorkGroupID.x] = _131;
     }
 }
 

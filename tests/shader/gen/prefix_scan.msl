@@ -64,25 +64,26 @@ struct ParentBuf
     Monoid_1 parent[1];
 };
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(512u, 1u, 1u);
-
 static inline __attribute__((always_inline))
 Monoid combine_monoid(thread const Monoid& a, thread const Monoid& b)
 {
     return Monoid{ a.element + b.element };
 }
 
-kernel void main0(device DataBuf& _42 [[buffer(0)]], const device ParentBuf& _141 [[buffer(1)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]], uint3 gl_WorkGroupID [[threadgroup_position_in_grid]])
+kernel void main0(device DataBuf& _42 [[buffer(0)]], const device ParentBuf& _139 [[buffer(1)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]], uint3 gl_WorkGroupID [[threadgroup_position_in_grid]])
 {
     threadgroup spvUnsafeArray<Monoid, 512> sh_scratch;
     uint ix = gl_GlobalInvocationID.x * 8u;
     spvUnsafeArray<Monoid, 8> local;
-    local[0].element = _42.data[ix].element;
-    Monoid param_1;
+    Monoid _48;
+    _48.element = _42.data[ix].element;
+    local[0] = _48;
     for (uint i = 1u; i < 8u; i++)
     {
         Monoid param = local[i - 1u];
-        param_1.element = _42.data[ix + i].element;
+        Monoid _71;
+        _71.element = _42.data[ix + i].element;
+        Monoid param_1 = _71;
         local[i] = combine_monoid(param, param_1);
     }
     Monoid agg = local[7];
@@ -104,7 +105,9 @@ kernel void main0(device DataBuf& _42 [[buffer(0)]], const device ParentBuf& _14
     Monoid row = Monoid{ 0u };
     if (gl_WorkGroupID.x > 0u)
     {
-        row.element = _141.parent[gl_WorkGroupID.x - 1u].element;
+        Monoid _145;
+        _145.element = _139.parent[gl_WorkGroupID.x - 1u].element;
+        row = _145;
     }
     if (gl_LocalInvocationID.x > 0u)
     {
@@ -117,7 +120,9 @@ kernel void main0(device DataBuf& _42 [[buffer(0)]], const device ParentBuf& _14
         Monoid param_6 = row;
         Monoid param_7 = local[i_2];
         Monoid m = combine_monoid(param_6, param_7);
-        _42.data[ix + i_2].element = m.element;
+        Monoid_1 _181;
+        _181.element = m.element;
+        _42.data[ix + i_2] = _181;
     }
 }
 

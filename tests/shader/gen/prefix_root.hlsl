@@ -3,9 +3,7 @@ struct Monoid
     uint element;
 };
 
-static const uint3 gl_WorkGroupSize = uint3(512u, 1u, 1u);
-
-static const Monoid _131 = { 0u };
+static const Monoid _129 = { 0u };
 
 RWByteAddressBuffer _42 : register(u0, space0);
 
@@ -31,14 +29,17 @@ void comp_main()
     Monoid _46;
     _46.element = _42.Load(ix * 4 + 0);
     Monoid local[8];
-    local[0].element = _46.element;
-    Monoid param_1;
+    Monoid _48;
+    _48.element = _46.element;
+    local[0] = _48;
     for (uint i = 1u; i < 8u; i++)
     {
         Monoid param = local[i - 1u];
+        Monoid _70;
+        _70.element = _42.Load((ix + i) * 4 + 0);
         Monoid _71;
-        _71.element = _42.Load((ix + i) * 4 + 0);
-        param_1.element = _71.element;
+        _71.element = _70.element;
+        Monoid param_1 = _71;
         local[i] = combine_monoid(param, param_1);
     }
     Monoid agg = local[7];
@@ -57,7 +58,7 @@ void comp_main()
         sh_scratch[gl_LocalInvocationID.x] = agg;
     }
     GroupMemoryBarrierWithGroupSync();
-    Monoid row = _131;
+    Monoid row = _129;
     if (gl_LocalInvocationID.x > 0u)
     {
         row = sh_scratch[gl_LocalInvocationID.x - 1u];
@@ -67,7 +68,10 @@ void comp_main()
         Monoid param_4 = row;
         Monoid param_5 = local[i_2];
         Monoid m = combine_monoid(param_4, param_5);
-        _42.Store((ix + i_2) * 4 + 0, m.element);
+        uint _158 = ix + i_2;
+        Monoid _161;
+        _161.element = m.element;
+        _42.Store(_158 * 4 + 0, _161.element);
     }
 }
 

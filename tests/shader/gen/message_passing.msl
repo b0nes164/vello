@@ -23,8 +23,6 @@ struct ControlBuf
     uint failures;
 };
 
-constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(256u, 1u, 1u);
-
 static inline __attribute__((always_inline))
 uint permute_flag_ix(thread const uint& data_ix)
 {
